@@ -157,196 +157,289 @@ function title(c, x, y, size, color, align = 'left', maxW = 1700) {
   text(c, 'Meu passuk da Amidá', x, y, { font: font(tf, s), color, align, size: s });
 }
 
+/* ---------- texturas e pequenos desenhos ---------- */
+const TEX = {};
+function loadTextures(base = 'textures/') { return Promise.all(['paper', 'blotch', 'grain', 'stone'].map(n => TEX[n] ? 0 : new Promise(res => { const i = new Image(); i.onload = () => { TEX[n] = i; res() }; i.onerror = res; i.src = base + n + '.png' }))) }
+// aplica uma textura em tons de cinza sobre a área recortada atual
+function tex(x, name, alpha, scale = 1, mode = 'multiply') { const img = TEX[name]; if (!img) return; const p = x.createPattern(img, 'repeat'); if (scale !== 1 && p.setTransform) p.setTransform(new DOMMatrix().scale(scale)); x.save(); x.globalAlpha = alpha; x.globalCompositeOperation = mode; x.fillStyle = p; x.fillRect(0, 0, W, H); x.restore() }
+function clipped(x, path, fn) { x.save(); x.beginPath(); path(x); x.clip(); fn(); x.restore() }
+const rr = (l, t, w, h, r) => x => { x.moveTo(l + r, t); x.arcTo(l + w, t, l + w, t + h, r); x.arcTo(l + w, t + h, l, t + h, r); x.arcTo(l, t + h, l, t, r); x.arcTo(l, t, l + w, t, r); x.closePath() };
+function shadowed(x, color, blur, ox, oy, fn) { x.save(); x.shadowColor = color; x.shadowBlur = blur; x.shadowOffsetX = ox; x.shadowOffsetY = oy; fn(); x.restore() }
+function grad(x, x0, y0, x1, y1, stops) { const g = x.createLinearGradient(x0, y0, x1, y1); stops.forEach(([o, c]) => g.addColorStop(o, c)); return g }
+function hexagram(x, cx, cy, r, fill, stroke, lw) { const tri = a => { x.beginPath(); for (let k = 0; k < 3; k++) { const t = (a + 120 * k) * Math.PI / 180, px = cx + r * Math.cos(t), py = cy + r * Math.sin(t); k ? x.lineTo(px, py) : x.moveTo(px, py) } x.closePath() }; for (const a of [-90, 90]) { tri(a); if (fill) { x.fillStyle = fill; x.fill() } } if (stroke) for (const a of [-90, 90]) { tri(a); x.strokeStyle = stroke; x.lineWidth = lw || 3; x.lineJoin = 'round'; x.stroke() } }
+function tape(x, cx, cy, w, h, rot, color = '#efe2bd') { x.save(); x.translate(cx, cy); x.rotate(rot); x.globalAlpha = .82; x.fillStyle = color; x.beginPath(); x.moveTo(-w / 2, -h / 2); for (let i = 1; i <= 8; i++) x.lineTo(-w / 2 + (i % 2 ? 7 : 0), -h / 2 + i * h / 8); for (let i = 7; i >= 0; i--) x.lineTo(w / 2 - (i % 2 ? 7 : 0), -h / 2 + i * h / 8); x.closePath(); x.fill(); x.globalAlpha = .25; x.fillStyle = '#ffffff'; x.fillRect(-w / 2 + 10, -h / 2 + 6, w - 20, h * .25); x.restore() }
+function wood(x, l, t, w, h, base, r = 0, vertical = false) { clipped(x, rr(l, t, w, h, r), () => { x.fillStyle = base; x.fillRect(l, t, w, h); if (vertical) { x.save(); x.translate(l + w / 2, t + h / 2); x.rotate(Math.PI / 2); x.translate(-(l + w / 2), -(t + h / 2)); tex(x, 'grain', .55, 1.4); x.restore() } else tex(x, 'grain', .55, 1.4); x.fillStyle = grad(x, 0, t, 0, t + h, [[0, '#ffffff22'], [.5, '#ffffff00'], [1, '#00000026']]); x.fillRect(l, t, w, h) }) }
+function fingerprint(x, cx, cy, r, color) { x.save(); x.strokeStyle = color; x.lineWidth = 3; for (let k = 1; k <= 8; k++) { x.beginPath(); x.ellipse(cx, cy, r * k / 8, r * k / 6.2, .25, Math.PI * (.05 + k * .03), Math.PI * (1.85 - k * .02)); x.stroke() } x.restore() }
+function archPath(l, t, w, h, rad) { return x => { x.moveTo(l, t + h); x.lineTo(l, t + rad); x.ellipse(l + w / 2, t + rad, w / 2, rad, 0, Math.PI, 0); x.lineTo(l + w, t + h); x.closePath() } }
+
 /* ---------- os cinco modelos ---------- */
 const TEMPLATES = {
+  /* 1. Detetive: a base do cartão original, agora como pasta de investigação */
   detetive: {
     name: 'Detetive', palette: 'classico', titleFont: 'fredoka',
-    spots: n => [[2380, 1450, 200], [170, 1450, 200], [1273, 1460, 160], [1790, 200, 150]],
+    spots: n => [[175, 1705, 0], [1273, 1712, 0], [2380, 1450, 0], [1790, 360, 0]],
     draw(c, entries, art) {
-      const { b, P } = c; b.fillStyle = P.bg; b.fillRect(0, 0, W, H);
-      rounded(b, 28, 28, 2490, 1744, 42, P.card); rounded(b, 58, 58, 2430, 286, 35, P.band);
+      const { b, P } = c, kraft = mix('#dcb97f', P.accent2, .15), kraft2 = mix(kraft, '#5a3c14', .28);
+      b.fillStyle = mix(P.bg, P.band, .1); b.fillRect(0, 0, W, H); tex(b, 'blotch', .3, 2); tex(b, 'paper', .7);
+      // pasta de arquivo com uma folha por trás
+      shadowed(b, '#00000040', 26, 0, 10, () => { b.save(); b.translate(1273, 900); b.rotate(-.006); rounded(b, -1243, -862, 2486, 1730, 30, kraft2); b.restore() });
+      shadowed(b, '#00000033', 18, 0, 6, () => rounded(b, 28, 28, 2490, 1744, 30, kraft));
+      clipped(b, rr(28, 28, 2490, 1744, 30), () => { tex(b, 'blotch', .55, 1.3); tex(b, 'paper', .9); b.strokeStyle = '#00000014'; b.lineWidth = 2; for (let y = 60; y < H; y += 7) { b.beginPath(); b.moveTo(28, y); b.lineTo(2518, y + 3); b.stroke() } });
+      // faixa azul do título
+      clipped(b, rr(58, 58, 2430, 286, 35), () => { b.fillStyle = P.band; b.fillRect(58, 58, 2430, 286); b.strokeStyle = '#ffffff0d'; b.lineWidth = 14; for (let k = -300; k < 2600; k += 42) { b.beginPath(); b.moveTo(k, 58); b.lineTo(k + 286, 344); b.stroke() } tex(b, 'paper', .35) });
+      b.save(); b.setLineDash([16, 12]); b.strokeStyle = mix(P.accent2, '#ffffff', .25); b.lineWidth = 3; rounded(b, 74, 74, 2398, 254, 26, null, b.strokeStyle, 3); b.restore();
       rounded(b, 104, 87, 480, 47, 23, P.badge);
       text(c, 'LOCALIZADOR DO PASUK', 129, 119, { font: BOLD(24), color: ensure(P.band, P.badge, 4.5), align: 'left', size: 24 });
-      title(c, 100, 231, 87, P.onBand, 'left', 1740);
+      title(c, 100, 231, 87, P.onBand, 'left', 1720);
       text(c, 'Meu nome. Minhas letras. Minha descoberta.', 105, 294, { font: TEXT(32), color: P.onBand2, align: 'left', size: 32 });
-      if (art) { b.save(); rounded(b, 1886, 77, 581, 248, 25); b.clip(); const aw = art.naturalWidth || art.width, ah = art.naturalHeight || art.height, ratio = 581 / 248, sw = aw, sh = sw / ratio; b.drawImage(art, 0, Math.max(0, (ah - sh) / 2), sw, sh, 1886, 77, 581, 248); b.restore() }
+      // foto do detetive presa com fita
+      if (art) { const aw = art.naturalWidth || art.width, ah = art.naturalHeight || art.height; b.save(); b.translate(2170, 214); b.rotate(.035); shadowed(b, '#00000055', 22, 4, 10, () => { b.fillStyle = '#fbfaf5'; b.fillRect(-300, -150, 600, 318) }); const sw = aw, sh = aw * 282 / 564; b.drawImage(art, 0, Math.max(0, (ah - sh) / 2), sw, sh, -282, -132, 564, 262); b.restore(); tape(b, 2170, 64, 170, 44, -.05) }
       const n = entries.length, w = n === 2 ? 1164 : 2384;
       entries.forEach((e, i) => {
         const left = 80 + i * 1222, top = 390, cx = left + w / 2, accent = i ? P.acc2 : P.acc1, textW = n === 2 ? w - 126 : 1970;
-        rounded(b, left, top, w, 1110, 32, P.panel, P.line); rounded(b, left + 24, top + 24, w - 48, 158, 24, i ? P.soft2 : P.soft1);
+        shadowed(b, '#0000002e', 20, 0, 8, () => rounded(b, left, top, w, 1110, 18, P.panel));
+        clipped(b, rr(left, top, w, 1110, 18), () => { b.strokeStyle = mix(P.line, '#ffffff', .35); b.lineWidth = 2; for (let y = top + 236; y < top + 1090; y += 58) { b.beginPath(); b.moveTo(left, y); b.lineTo(left + w, y); b.stroke() } b.strokeStyle = '#e8a0a0'; b.beginPath(); b.moveTo(left + 18, top); b.lineTo(left + 18, top + 1110); b.stroke(); tex(b, 'paper', .35) });
+        rounded(b, left + 24, top + 24, w - 48, 158, 20, i ? P.soft2 : P.soft1);
+        tape(b, left + 60, top + 8, 150, 42, -.45); tape(b, left + w - 60, top + 8, 150, 42, .45);
         nameRow(c, e, i, { x: left + 24, y: top + 24, w: w - 48 }, accent);
         const f = fit(c, e, textW, 820, { he: n === 2 ? 94 : 114, comfort: 52, heMin: 52, pt: 34, ptMin: 27 });
         verse(c, e, f, cx, top + 212, accent);
         c.blocks.push(f);
       });
-      rounded(b, 80, 1532, 2384, 114, 25, P.soft1);
-      footer(c, 1273, 1579, 1621, 1694, P.ink, P.muted);
+      // etiqueta do rodapé, carimbo e pistas
+      shadowed(b, '#00000026', 10, 0, 4, () => rounded(b, 80, 1532, 2384, 114, 16, '#fffdf6'));
+      b.save(); b.setLineDash([12, 9]); rounded(b, 92, 1544, 2360, 90, 12, null, mix(P.line, P.band, .3), 3); b.restore();
+      b.save(); b.translate(2235, 1690); b.rotate(-.13); b.globalAlpha = .82; const red = '#c0392b'; rounded(b, -200, -50, 400, 100, 14, null, red, 7); rounded(b, -186, -37, 372, 74, 9, null, red, 3); b.fillStyle = red; b.font = 'bold 44px "CardText"'; b.textAlign = 'center'; b.fillText('CASO RESOLVIDO', 0, 16); b.restore();
+      fingerprint(b, 180, 1705, 48, mix(kraft2, '#3a2508', .3) + '88');
+      footer(c, 1273, 1579, 1621, 1694, P.ink, ensure(P.muted, kraft, 4.5));
     }
   },
 
+  /* 2. Jerusalém: pôr do sol, muralha de pedra e janelas em arco */
   jerusalem: {
     name: 'Jerusalém', palette: 'ceu', titleFont: 'suez',
-    paper: P => mix(P.bg, '#fffdf7', .8),
-    spots: n => [[150, 1700, 150], [2396, 1700, 150], [1273, 1500, 0], [600, 1500, 0]],
+    paper: P => mix(P.bg, '#fffaf0', .82),
+    spots: n => [[110, 380, 0], [2436, 380, 0], [430, 1720, 0], [2116, 1720, 0]],
     draw(c, entries) {
-      const { b, P } = c, sky1 = mix(P.band, '#ffffff', .78), sky2 = mix(P.accent2, '#ffffff', .7);
-      let g = b.createLinearGradient(0, 0, 0, H); g.addColorStop(0, sky1); g.addColorStop(.75, sky2); g.addColorStop(1, sky2); b.fillStyle = g; b.fillRect(0, 0, W, H);
-      g = b.createRadialGradient(2160, 300, 20, 2160, 300, 420); g.addColorStop(0, mix(P.accent2, '#ffffff', .55)); g.addColorStop(1, mix(P.accent2, '#ffffff', .55) + '00'); b.fillStyle = g; b.fillRect(1600, 0, 946, 900);
-      // silhueta da Cidade Velha dos dois lados do título
-      const stone = mix('#e6c98f', P.accent2, .2), stone2 = mix(stone, '#7a5a2a', .25), ol = mix(P.band, '#000000', .2), dome = mix(P.band, '#ffffff', .65), tree = mix(P.accent, '#2f5d3a', .6);
-      b.fillStyle = mix(P.accent2, sky2, .45); b.beginPath(); b.moveTo(0, 352); b.bezierCurveTo(500, 316, 900, 362, 1273, 340); b.bezierCurveTo(1700, 318, 2100, 360, W, 330); b.lineTo(W, 420); b.lineTo(0, 420); b.fill();
-      const house = (x, y, w, h) => { rounded(b, x, y, w, h, 4, stone, ol, 6); for (let k = x + 28; k < x + w - 30; k += 64) rounded(b, k, y + 34, 24, 40, 12, ol) };
-      const cypress = (x, y, h) => { b.fillStyle = tree; b.beginPath(); b.ellipse(x, y - h / 2, 30, h / 2, 0, 0, 7); b.fill(); b.strokeStyle = ol; b.lineWidth = 5; b.stroke() };
-      cypress(46, 352, 190); house(80, 215, 170, 140); rounded(b, 270, 200, 210, 155, 4, stone, ol, 6);
-      b.fillStyle = dome; b.beginPath(); b.ellipse(375, 202, 104, 108, 0, Math.PI, 0); b.closePath(); b.fill(); b.strokeStyle = ol; b.lineWidth = 6; b.stroke(); rounded(b, 362, 70, 26, 30, 4, dome, ol, 5);
-      for (const x of [300, 352, 404]) rounded(b, x, 250, 26, 60, 13, ol);
-      house(500, 240, 170, 115); cypress(708, 356, 170);
-      rounded(b, 1830, 130, 150, 225, 4, stone, ol, 6); for (let k = 0; k < 4; k++) rounded(b, 1824 + k * 44, 98, 30, 40, 3, stone, ol, 5); rounded(b, 1890, 190, 30, 64, 15, ol);
-      cypress(1800, 356, 160); house(2000, 225, 200, 130); house(2220, 255, 170, 100); cypress(2440, 356, 200); cypress(2500, 356, 150);
-      // muralha
-      b.fillStyle = stone; b.beginPath(); b.moveTo(0, 1500); for (let x = 0; x < W; x += 92) { b.lineTo(x, 1460); b.lineTo(x + 46, 1460); b.lineTo(x + 46, 1500); b.lineTo(x + 92, 1500) } b.lineTo(W, H); b.lineTo(0, H); b.closePath(); b.fill(); b.strokeStyle = ol; b.lineWidth = 6; b.stroke();
-      b.strokeStyle = stone2; b.lineWidth = 4; for (let y = 1560, r = 0; y < H; y += 60, r++) for (let x = r % 2 ? 0 : 70; x < W; x += 140) { b.beginPath(); b.moveTo(x, y); b.lineTo(x + 110, y); b.stroke() }
-      // título
-      const tc = ensure(P.band, sky1, 4.5);
-      title(c, 1273, 190, 100, tc, 'center', 1000);
-      text(c, 'Meu nome. Minhas letras. Minha descoberta.', 1273, 262, { font: TEXT(34), color: ensure(mix(P.band, '#000', .1), sky1, 4.5), size: 34 });
-      b.fillStyle = P.accent2; for (const s of [-1, 1]) { b.fillRect(1273 + s * 120 - (s < 0 ? 220 : 0), 296, 220, 5); b.save(); b.translate(1273 + s * 360, 298); b.rotate(Math.PI / 4); b.fillRect(-11, -11, 22, 22); b.restore() }
-      // janelas em arco
-      const n = entries.length, top = 400, h = 1045, arc = 120;
-      const boxes = n === 2 ? [[150, 1093], [1303, 1093]] : [[330, 1886]];
+      const { b, P } = c, sky1 = mix(P.band, '#ffffff', .42), sky2 = mix(P.accent2, '#ffffff', .5), hor = mix('#ffd29a', P.accent2, .2);
+      b.fillStyle = grad(b, 0, 0, 0, 1450, [[0, sky1], [.55, sky2], [1, hor]]); b.fillRect(0, 0, W, H);
+      let g = b.createRadialGradient(2080, 330, 30, 2080, 330, 620); g.addColorStop(0, '#fff7dccc'); g.addColorStop(.3, mix('#ffe0a0', P.accent2, .2) + '88'); g.addColorStop(1, '#ffe0a000'); b.fillStyle = g; b.fillRect(0, 0, W, 1300);
+      circle(b, 2080, 330, 115, '#fff3cf');
+      // nuvens e pássaros
+      for (const [x, y, s] of [[260, 170, 1], [700, 300, .7], [1650, 150, .8], [2350, 560, .6], [1180, 90, .55]]) { b.fillStyle = '#ffffff4d'; for (const [dx, dy, rx, ry] of [[0, 0, 160, 34], [90, -22, 110, 36], [-90, -12, 100, 28], [40, 14, 170, 26]]) { b.beginPath(); b.ellipse(x + dx * s, y + dy * s, rx * s, ry * s, 0, 0, 7); b.fill() } }
+      b.strokeStyle = mix(P.band, '#000000', .3) + 'aa'; b.lineWidth = 5; b.lineCap = 'round';
+      for (const [x, y, s] of [[480, 240, 1], [540, 280, .8], [1830, 470, .9], [1890, 430, .7], [300, 330, .6]]) { b.beginPath(); b.moveTo(x - 26 * s, y - 8 * s); b.quadraticCurveTo(x - 12 * s, y - 20 * s, x, y); b.quadraticCurveTo(x + 12 * s, y - 20 * s, x + 26 * s, y - 8 * s); b.stroke() }
+      // colinas e cidade ao longe
+      const hill = (y, color, amp, seed) => { const r = rng(seed); b.fillStyle = color; b.beginPath(); b.moveTo(0, H); b.lineTo(0, y); for (let x = 0; x <= W; x += 160) b.quadraticCurveTo(x + 80, y - amp * r(), x + 160, y - amp * .4 + amp * .8 * r()); b.lineTo(W, H); b.fill() };
+      hill(1060, mix(P.band, sky2, .6) + 'aa', 90, 3); hill(1150, mix(P.accent2, '#9b7a4a', .45) + 'cc', 70, 9);
+      const far = mix(P.band, hor, .5), r = rng(21);
+      b.fillStyle = far; for (let x = 0; x < W; x += 70 + r() * 60) { const h = 60 + r() * 120, w = 60 + r() * 70; b.fillRect(x, 1250 - h, w, h + 300); if (r() > .7) { b.beginPath(); b.ellipse(x + w / 2, 1250 - h, w / 2.2, w / 2.2, 0, Math.PI, 0); b.fill() } }
+      // torres em pedra dos dois lados
+      const stone = mix('#ead2a0', P.accent2, .12), stone2 = mix(stone, '#7a5a2a', .3), ol = mix(P.band, '#000000', .35);
+      const block = (l, t, w, h) => { clipped(b, x => x.rect(l, t, w, h), () => { b.fillStyle = stone; b.fillRect(l, t, w, h); tex(b, 'stone', .55); b.strokeStyle = stone2; b.lineWidth = 3; for (let y = t + 46, k = 0; y < t + h; y += 46, k++) { b.beginPath(); b.moveTo(l, y); b.lineTo(l + w, y); b.stroke(); for (let x = l + (k % 2 ? 40 : 0); x < l + w; x += 80) { b.beginPath(); b.moveTo(x, y); b.lineTo(x, y + 46); b.stroke() } } }); b.strokeStyle = ol; b.lineWidth = 6; b.strokeRect(l, t, w, h) };
+      const crenel = (l, t, w) => { for (let x = l; x < l + w - 10; x += 52) block(x, t - 34, 30, 36) };
+      block(40, 760, 250, 700); crenel(40, 760, 250); rounded(b, 140, 900, 50, 110, 25, ol); rounded(b, 140, 1120, 50, 110, 25, ol);
+      block(2260, 980, 250, 480); b.fillStyle = mix(P.band, '#ffffff', .62); b.beginPath(); b.ellipse(2385, 982, 118, 128, 0, Math.PI, 0); b.closePath(); b.fill(); b.strokeStyle = ol; b.lineWidth = 6; b.stroke(); rounded(b, 2372, 836, 26, 30, 4, mix(P.band, '#ffffff', .62), ol, 5);
+      const tree = mix(P.accent, '#2f5d3a', .65); for (const [x, y, h] of [[330, 1460, 330], [2220, 1460, 260]]) { b.fillStyle = tree; b.beginPath(); b.ellipse(x, y - h / 2, 36, h / 2, 0, 0, 7); b.fill(); b.strokeStyle = ol; b.lineWidth = 5; b.stroke() }
+      // título com brilho
+      const plate = mix(sky1, '#ffffff', .72); shadowed(b, '#0000001f', 24, 0, 6, () => rounded(b, 680, 60, 1186, 222, 111, plate + 'e6')); title(c, 1273, 178, 100, ensure(P.band, plate, 7), 'center', 1080); text(c, 'Meu nome. Minhas letras. Minha descoberta.', 1273, 246, { font: BOLD(30), color: ensure(mix(P.band, '#000', .15), plate, 4.5), size: 30 });
+      // janelas em arco feitas de pedra
+      const n = entries.length, top = 372, h = 1068, arc = 200, ring = 54;
+      const boxes = n === 2 ? [[130, 1113], [1303, 1113]] : [[360, 1826]];
       entries.forEach((e, i) => {
         const [x, w] = boxes[i], cx = x + w / 2, accent = i ? P.acc2 : P.acc1;
-        const arch = (inset, fill, stroke, lw) => { b.beginPath(); b.moveTo(x + inset, top + h - inset); b.lineTo(x + inset, top + arc + inset); b.ellipse(cx, top + arc + inset, w / 2 - inset, arc, 0, Math.PI, 0); b.lineTo(x + w - inset, top + h - inset); b.closePath(); if (fill) { b.fillStyle = fill; b.fill() } if (stroke) { b.strokeStyle = stroke; b.lineWidth = lw; b.stroke() } };
-        b.save(); b.shadowColor = '#00000030'; b.shadowBlur = 30; b.shadowOffsetY = 12; arch(0, P.paper); b.restore();
-        arch(0, null, stone2, 14); arch(22, null, P.accent2, 3);
-        nameStack(c, e, i, { x, y: top + 70, w }, accent, { side: 200 });
-        const f = fit(c, e, w - (n === 2 ? 110 : 220), 720, { he: n === 2 ? 90 : 110, comfort: 52, heMin: 50, pt: 34, ptMin: 27 });
-        verse(c, e, f, cx, top + 280, accent);
+        shadowed(b, '#00000040', 30, 0, 12, () => { b.beginPath(); archPath(x - ring, top - ring, w + ring * 2, h + ring, arc + ring)(b); b.fillStyle = stone; b.fill() });
+        clipped(b, archPath(x - ring, top - ring, w + ring * 2, h + ring, arc + ring), () => { tex(b, 'stone', .6); b.strokeStyle = stone2; b.lineWidth = 4; for (let a = 0; a <= 180; a += 9) { const t = Math.PI + a * Math.PI / 180; b.beginPath(); b.moveTo(cx + (w / 2) * Math.cos(t), top + arc + arc * Math.sin(t)); b.lineTo(cx + (w / 2 + ring) * Math.cos(t), top + arc + (arc + ring) * Math.sin(t)); b.stroke() } for (let y = top + arc + 80; y < top + h; y += 80) for (const sx of [x - ring, x + w]) { b.beginPath(); b.moveTo(sx, y); b.lineTo(sx + ring, y); b.stroke() } });
+        b.beginPath(); archPath(x - ring, top - ring, w + ring * 2, h + ring, arc + ring)(b); b.strokeStyle = ol; b.lineWidth = 5; b.stroke();
+        // pedra-chave com Magen David
+        rounded(b, cx - 50, top - ring - 18, 100, ring + 40, 10, mix(stone, '#ffffff', .2), ol, 5); hexagram(b, cx, top - ring / 2 + 2, 26, null, stone2, 4);
+        clipped(b, archPath(x, top, w, h, arc), () => { b.fillStyle = P.paper; b.fillRect(x, top, w, h); tex(b, 'paper', .5); tex(b, 'blotch', .12); b.strokeStyle = '#00000024'; b.lineWidth = 26; b.beginPath(); archPath(x, top, w, h, arc)(b); b.stroke() });
+        b.beginPath(); archPath(x + 22, top + 22, w - 44, h - 22, arc - 22)(b); b.strokeStyle = P.accent2; b.lineWidth = 3; b.stroke();
+        nameStack(c, e, i, { x, y: top + 95, w }, accent, { side: 220 });
+        const f = fit(c, e, w - (n === 2 ? 110 : 220), 730, { he: n === 2 ? 90 : 110, comfort: 52, heMin: 50, pt: 34, ptMin: 27 });
+        verse(c, e, f, cx, top + 300, accent);
         c.blocks.push(f);
       });
-      rounded(b, 330, 1556, 1886, 118, 59, P.paper, stone2, 6);
-      footer(c, 1273, 1603, 1645, 1750, ensure(P.band, P.paper, 7), ensure(mix(P.band, '#000', .3), stone, 4.5));
+      // muralha na frente
+      b.save(); b.beginPath(); b.moveTo(0, 1470); for (let x = 0; x < W; x += 104) { b.lineTo(x, 1430); b.lineTo(x + 52, 1430); b.lineTo(x + 52, 1470); b.lineTo(x + 104, 1470) } b.lineTo(W, H); b.lineTo(0, H); b.closePath(); b.fillStyle = stone; b.fill(); b.clip(); tex(b, 'stone', .6); b.strokeStyle = stone2; b.lineWidth = 4; for (let y = 1520, k = 0; y < H; y += 62, k++) { b.beginPath(); b.moveTo(0, y); b.lineTo(W, y); b.stroke(); for (let x = k % 2 ? 0 : 75; x < W; x += 150) { b.beginPath(); b.moveTo(x, y); b.lineTo(x, y + 62); b.stroke() } } b.fillStyle = grad(b, 0, 1430, 0, H, [[0, '#ffffff00'], [1, '#00000033']]); b.fillRect(0, 1430, W, 370); b.restore();
+      b.strokeStyle = ol; b.lineWidth = 6; b.beginPath(); b.moveTo(0, 1470); for (let x = 0; x < W; x += 104) { b.lineTo(x, 1430); b.lineTo(x + 52, 1430); b.lineTo(x + 52, 1470); b.lineTo(x + 104, 1470) } b.stroke();
+      for (const gx of [250, 2296]) { b.fillStyle = mix(ol, '#000', .2); b.beginPath(); archPath(gx - 70, 1580, 140, 220, 70)(b); b.fill() }
+      shadowed(b, '#00000040', 16, 0, 6, () => rounded(b, 590, 1544, 1366, 176, 22, mix(stone, '#ffffff', .55)));
+      rounded(b, 606, 1560, 1334, 144, 14, null, stone2, 4);
+      footer(c, 1273, 1600, 1642, 1690, ensure(P.band, mix(stone, '#ffffff', .55), 7), ensure(mix(P.band, '#000', .3), mix(stone, '#ffffff', .55), 4.5));
     }
   },
 
+  /* 3. Pergaminho: rolo de pergaminho sobre tecido, com selo de cera */
   pergaminho: {
     name: 'Pergaminho', palette: 'terra', titleFont: 'bellefair',
-    paper: P => mix('#f5e6c4', P.bg, .15),
-    spots: n => [[110, 1730, 0], [1273, 1500, 150], [430, 1520, 150], [2116, 1520, 150], [430, 300, 150], [2116, 300, 150]],
+    paper: P => mix('#f1dcae', P.bg, .12),
+    spots: n => [[110, 110, 0], [2436, 110, 0], [110, 1690, 0], [2436, 1690, 0], [1273, 1730, 0]],
     draw(c, entries) {
-      const { b, P } = c, par = P.paper, par2 = mix(par, '#8a5a2b', .28), wood = mix('#8a5a2b', P.band, .25), wood2 = mix(wood, '#000', .35);
-      b.fillStyle = P.bg; b.fillRect(0, 0, W, H);
-      b.strokeStyle = mix(P.bg, P.accent, .12); b.lineWidth = 14; for (let x = -H; x < W; x += 90) { b.beginPath(); b.moveTo(x, 0); b.lineTo(x + H, H); b.stroke() }
-      // folha
-      let g = b.createRadialGradient(1273, 900, 300, 1273, 900, 1400); g.addColorStop(0, mix(par, '#ffffff', .35)); g.addColorStop(1, par); b.save(); b.shadowColor = '#00000040'; b.shadowBlur = 40; b.shadowOffsetY = 14; b.fillStyle = g; b.fillRect(230, 175, 2086, 1450); b.restore();
-      b.strokeStyle = par2; b.lineWidth = 3; b.strokeRect(290, 225, 1966, 1350); b.strokeRect(306, 241, 1934, 1318);
-      // rolos laterais com cabos de madeira
-      for (const x of [160, 2386]) {
-        for (const [y1, y2] of [[50, 190], [1610, 1750]]) { rounded(b, x - 24, y1, 48, y2 - y1, 22, wood, wood2, 5); circle(b, x, y1 < 900 ? y1 : y2, 30, mix(P.accent2, '#e8b54a', .5), wood2, 5) }
-        g = b.createLinearGradient(x - 90, 0, x + 90, 0); g.addColorStop(0, par2); g.addColorStop(.45, mix(par, '#ffffff', .4)); g.addColorStop(1, par2);
-        rounded(b, x - 90, 150, 180, 1500, 60, g, wood2, 5);
-        for (const y of [200, 1600]) { b.fillStyle = mix(P.accent2, '#e8b54a', .5); b.beginPath(); b.ellipse(x, y, 110, 26, 0, 0, 7); b.fill(); b.strokeStyle = wood2; b.lineWidth = 5; b.stroke() }
+      const { b, P } = c, par = P.paper, burn = mix('#8a5a24', P.band, .2), cloth = mix(P.band, '#000000', .3);
+      if (!c.design.ptColor) c.P.pt = ensure(mix('#5a3d1e', P.band, .3), par, 4.5);
+      c.P.ink = ensure(mix('#2e1c0c', P.band, .25), par, 7);
+      // tecido de veludo
+      b.fillStyle = cloth; b.fillRect(0, 0, W, H); tex(b, 'blotch', .45, 2.5); tex(b, 'paper', .5);
+      let g = b.createRadialGradient(1273, 900, 400, 1273, 900, 1600); g.addColorStop(0, '#ffffff14'); g.addColorStop(1, '#00000080'); b.fillStyle = g; b.fillRect(0, 0, W, H);
+      // folha com bordas irregulares
+      const r = rng(4), edge = []; for (let x = 250; x <= 2296; x += 46) edge.push([x, 150 + (r() - .5) * 16]); const bottom = []; for (let x = 2296; x >= 250; x -= 46) bottom.push([x, 1660 + (r() - .5) * 16]);
+      const sheet = x => { x.moveTo(250, 150); edge.forEach(p => x.lineTo(...p)); x.lineTo(2296, 1660); bottom.forEach(p => x.lineTo(...p)); x.closePath() };
+      shadowed(b, '#000000a0', 50, 0, 18, () => { b.beginPath(); sheet(b); b.fillStyle = par; b.fill() });
+      clipped(b, sheet, () => { tex(b, 'blotch', .65, 1.2); tex(b, 'paper', .9); g = b.createRadialGradient(1273, 905, 500, 1273, 905, 1250); g.addColorStop(0, burn + '00'); g.addColorStop(.75, burn + '22'); g.addColorStop(1, burn + '88'); b.fillStyle = g; b.fillRect(0, 0, W, H); b.strokeStyle = burn + '66'; b.lineWidth = 18; b.beginPath(); sheet(b); b.stroke() });
+      // margens e ornamentos de canto
+      const ink = mix(burn, '#3a2410', .5); b.strokeStyle = ink + '99'; b.lineWidth = 3; b.strokeRect(330, 280, 1886, 1290); b.lineWidth = 1.5; b.strokeRect(344, 294, 1858, 1262);
+      const curl = (x, y, sx, sy) => { b.save(); b.translate(x, y); b.scale(sx, sy); b.strokeStyle = mix(P.accent2, ink, .3); b.lineWidth = 5; b.beginPath(); b.moveTo(0, 90); b.bezierCurveTo(0, 20, 20, 0, 90, 0); b.stroke(); b.beginPath(); b.moveTo(20, 120); b.bezierCurveTo(20, 50, 50, 20, 120, 20); b.stroke(); b.beginPath(); b.arc(52, 52, 18, 0, 6.3); b.stroke(); b.fillStyle = mix(P.accent2, ink, .3); b.beginPath(); b.arc(52, 52, 6, 0, 7); b.fill(); b.restore() };
+      curl(318, 268, 1, 1); curl(2228, 268, -1, 1); curl(318, 1582, 1, -1); curl(2228, 1582, -1, -1);
+      // rolos com cabos de madeira torneada
+      const woodC = mix('#8a5426', P.band, .15), woodD = mix(woodC, '#000', .4), gold = mix('#d9a441', P.accent2, .3);
+      for (const x of [205, 2341]) {
+        for (const [y0, dir] of [[150, -1], [1660, 1]]) { const y = y0 + dir * 26; rounded(b, x - 24, Math.min(y, y + dir * 84), 48, 84, 16, woodC, woodD, 4); b.fillStyle = gold; b.beginPath(); b.ellipse(x, y0 + dir * 8, 96, 22, 0, 0, 7); b.fill(); b.strokeStyle = woodD; b.lineWidth = 4; b.stroke(); b.fillStyle = woodC; b.beginPath(); b.ellipse(x, y + dir * 56, 38, 16, 0, 0, 7); b.fill(); b.stroke(); circle(b, x, y + dir * 100, 28, woodC, woodD, 4); circle(b, x - 8, y + dir * 100 - 8, 8, '#ffffff40') }
+        b.fillStyle = grad(b, x - 75, 0, x + 75, 0, [[0, mix(par, burn, .5)], [.35, mix(par, '#ffffff', .35)], [1, mix(par, burn, .6)]]);
+        b.beginPath(); b.roundRect ? b.roundRect(x - 75, 150, 150, 1510, 40) : b.rect(x - 75, 150, 150, 1510); b.fill(); b.strokeStyle = burn; b.lineWidth = 4; b.stroke();
+        clipped(b, x2 => x2.rect(x - 75, 150, 150, 1510), () => tex(b, 'blotch', .4, 1.2));
       }
       // faixa do título
-      const band = P.band, band2 = mix(P.band, '#000', .3);
-      poly(b, [[620, 110], [800, 110], [800, 290], [620, 290], [670, 200]], band2); poly(b, [[1926, 110], [1746, 110], [1746, 290], [1926, 290], [1876, 200]], band2);
-      rounded(b, 740, 80, 1066, 200, 18, band); b.strokeStyle = mix(P.accent2, '#ffffff', .3); b.lineWidth = 4; b.strokeRect(764, 100, 1018, 160);
-      title(c, 1273, 210, 96, P.onBand, 'center', 960);
-      text(c, 'Meu nome. Minhas letras. Minha descoberta.', 1273, 352, { font: TEXT(32), color: ensure(P.band, par, 7), size: 32 });
-      const n = entries.length, top = 400, boxes = n === 2 ? [[330, 913], [1303, 913]] : [[380, 1786]];
-      if (n === 2) { b.strokeStyle = mix(P.accent2, par, .2); b.lineWidth = 4; b.beginPath(); b.moveTo(1273, 430); b.lineTo(1273, 1400); b.stroke(); b.save(); b.translate(1273, 915); b.rotate(Math.PI / 4); b.fillStyle = P.accent2; b.fillRect(-16, -16, 32, 32); b.restore() }
+      const rib = mix(P.accent, P.band, .35), rib2 = mix(rib, '#000', .35);
+      poly(b, [[600, 112], [790, 112], [790, 282], [600, 282], [655, 197]], rib2); poly(b, [[1946, 112], [1756, 112], [1756, 282], [1946, 282], [1891, 197]], rib2);
+      shadowed(b, '#00000055', 16, 0, 8, () => rounded(b, 720, 78, 1106, 190, 12, rib));
+      b.strokeStyle = gold; b.lineWidth = 4; b.strokeRect(742, 96, 1062, 154); b.lineWidth = 1.5; b.strokeRect(752, 106, 1042, 134);
+      title(c, 1273, 205, 94, best(rib, '#fff8e8', '#1a1008'), 'center', 980);
+      text(c, 'Meu nome. Minhas letras. Minha descoberta.', 1273, 340, { font: TEXT(32), color: c.P.ink, size: 32 });
+      const n = entries.length, top = 390, boxes = n === 2 ? [[360, 900], [1286, 900]] : [[400, 1746]];
+      if (n === 2) { b.strokeStyle = ink + 'aa'; b.lineWidth = 3; b.beginPath(); b.moveTo(1273, 420); b.lineTo(1273, 1400); b.stroke(); hexagram(b, 1273, 910, 26, par, ink, 3) }
       entries.forEach((e, i) => {
         const [x, w] = boxes[i], cx = x + w / 2, accent = i ? P.acc2 : P.acc1;
-        nameStack(c, e, i, { x, y: top, w }, accent, { flourish: mix(P.accent2, par, .2), side: 360 });
-        const f = fit(c, e, w - 40, 820, { he: n === 2 ? 92 : 112, comfort: 52, heMin: 50, pt: 34, ptMin: 27 });
-        verse(c, e, f, cx, top + 222, accent, { divider: P.accent2 });
+        nameStack(c, e, i, { x, y: top, w }, accent, { flourish: mix(P.accent2, ink, .25), side: 360, nameColor: c.P.ink });
+        const f = fit(c, e, w - 40, 830, { he: n === 2 ? 92 : 112, comfort: 52, heMin: 50, pt: 34, ptMin: 27 });
+        verse(c, e, f, cx, top + 222, accent, { divider: mix(P.accent2, ink, .3) });
         c.blocks.push(f);
       });
-      b.strokeStyle = par2; b.lineWidth = 3; b.beginPath(); b.moveTo(700, 1468); b.lineTo(1846, 1468); b.stroke();
-      footer(c, 1273, 1512, 1552, 1765, ensure(P.band, par, 7), ensure(mix(P.band, '#000', .2), P.bg, 4.5));
+      // selo de cera
+      const wax = '#a3262a', sx = 2080, sy = 1535; b.save(); b.fillStyle = wax; for (const [dx, dy] of [[0, 92], [-30, 88], [32, 86]]) { b.beginPath(); b.moveTo(sx + dx - 18, sy); b.lineTo(sx + dx - 18, sy + dy + 40); b.lineTo(sx + dx, sy + dy + 22); b.lineTo(sx + dx + 18, sy + dy + 40); b.lineTo(sx + dx + 18, sy); b.fillStyle = mix(P.accent, '#7a1f2a', .6); b.fill() } b.restore();
+      shadowed(b, '#00000066', 12, 0, 6, () => { b.beginPath(); for (let a = 0; a <= 360; a += 15) { const rr2 = 74 + (a % 30 ? 6 : -3); b.lineTo(sx + rr2 * Math.cos(a * Math.PI / 180), sy + rr2 * Math.sin(a * Math.PI / 180)) } b.closePath(); b.fillStyle = wax; b.fill() });
+      circle(b, sx, sy, 52, null, '#7a1518', 5); hexagram(b, sx, sy, 32, null, '#7a1518', 5); circle(b, sx - 22, sy - 26, 12, '#ffffff33');
+      b.strokeStyle = ink + '88'; b.lineWidth = 3; b.beginPath(); b.moveTo(700, 1470); b.lineTo(1846, 1470); b.stroke();
+      footer(c, 1273, 1512, 1552, 1765, c.P.ink, ensure('#e9dcc0', cloth, 4.5));
     }
   },
 
+  /* 4. Geométrico colorido: mosaico de triângulos e Maguen David */
   geometrico: {
     name: 'Geométrico colorido', palette: 'lavanda', titleFont: 'bubbles',
-    spots: n => [[1960, 200, 190], [2330, 205, 170], [120, 1700, 0], [2440, 1700, 0]],
+    spots: n => [[1950, 205, 0], [2370, 200, 0], [120, 1700, 0], [2436, 1700, 0]],
     draw(c, entries) {
-      const { b, P } = c, r = rng(11), cols = [mix(P.accent, '#ffffff', .55), mix(P.accent2, '#ffffff', .5), mix(P.band, '#ffffff', .7), mix(P.accent, '#ffffff', .75)];
-      b.fillStyle = P.bg; b.fillRect(0, 0, W, H);
-      b.fillStyle = mix(P.band, P.bg, .9); for (let y = 30; y < H; y += 60) for (let x = (y / 60 % 2) * 30; x < W; x += 60) { b.beginPath(); b.arc(x, y, 5, 0, 7); b.fill() }
-      circle(b, 2330, 120, 300, cols[0]); circle(b, 90, 1700, 260, cols[1]);
-      poly(b, [[2546, 1250], [2546, 1800], [2000, 1800]], cols[2]); poly(b, [[0, 300], [220, 520], [0, 740]], cols[3]);
-      for (let k = 0; k < 14; k++) { const x = r() * W, y = r() * H, s = 30 + r() * 50, col = cols[k % 4]; if (k % 3 === 0) circle(b, x, y, s * .6, col); else if (k % 3 === 1) poly(b, [[x, y - s], [x + s, y + s * .7], [x - s, y + s * .7]], col); else { b.save(); b.translate(x, y); b.rotate(r() * 3); b.fillStyle = col; b.fillRect(-s / 2, -s / 2, s, s); b.restore() } }
+      const { b, P } = c, r = rng(17), cols = [mix(P.accent, '#ffffff', .25), mix(P.accent2, '#ffffff', .2), mix(P.band, '#ffffff', .35), mix(P.accent, '#ffffff', .6), mix(P.accent2, '#ffffff', .6), mix(P.bg, '#ffffff', .3)];
+      b.fillStyle = mix(P.bg, '#ffffff', .4); b.fillRect(0, 0, W, H);
+      // mosaico de triângulos
+      const s = 132, hgt = s * Math.sqrt(3) / 2;
+      for (let row = -1, y = -hgt; y < H + hgt; row++, y += hgt) for (let k = -2; k < W / (s / 2) + 2; k++) {
+        const x = k * s / 2 + (row % 2 ? s / 2 : 0), up = (k + row) % 2 === 0, d = Math.hypot((x - 1273) / 1.3, y - 900);
+        const pick = r(), col = d < 650 ? cols[5] : pick < .25 ? cols[0] : pick < .45 ? cols[1] : pick < .6 ? cols[2] : pick < .78 ? cols[3] : cols[4];
+        poly(b, up ? [[x, y + hgt], [x + s / 2, y], [x + s, y + hgt]] : [[x, y], [x + s, y], [x + s / 2, y + hgt]], col, '#ffffff', 5);
+      }
+      tex(b, 'paper', .45);
+      for (const [x, y, rad, i] of [[2390, 1560, 120, 0], [150, 330, 90, 1], [2440, 760, 70, 2], [90, 1180, 60, 0]]) hexagram(b, x, y, rad, [P.accent, P.accent2, mix(P.band, '#ffffff', .3)][i], P.band, 8);
       // cabeçalho com sombra sólida
-      rounded(b, 98, 88, 1650, 262, 40, P.accent2); rounded(b, 80, 70, 1650, 262, 40, P.band);
-      title(c, 140, 212, 96, P.onBand, 'left', 1520);
-      text(c, 'Meu nome. Minhas letras. Minha descoberta.', 142, 288, { font: TEXT(32), color: P.onBand2, align: 'left', size: 32 });
-      circle(b, 1960, 200, 110, P.accent, P.band, 10); poly(b, [[2160, 330], [2260, 120], [2360, 330]], P.accent2, P.band, 10); b.save(); b.translate(2400, 330); b.rotate(.3); rounded(b, -60, -60, 120, 120, 16, mix(P.band, '#ffffff', .4), P.band, 10); b.restore();
+      b.save(); b.translate(930, 205); b.rotate(-.018); rounded(b, -850, -135, 1700, 270, 40, P.accent2); b.restore();
+      rounded(b, 70, 62, 1700, 270, 40, P.band); b.save(); b.setLineDash([2, 18]); b.lineCap = 'round'; rounded(b, 92, 84, 1656, 226, 28, null, mix(P.band, '#ffffff', .4), 6); b.restore();
+      title(c, 140, 210, 98, P.onBand, 'left', 1540);
+      text(c, 'Meu nome. Minhas letras. Minha descoberta.', 142, 286, { font: TEXT(32), color: P.onBand2, align: 'left', size: 32 });
+      circle(b, 1960, 200, 112, P.accent, P.band, 10); hexagram(b, 1960, 200, 62, '#ffffff', null);
+      b.save(); b.translate(2280, 205); b.rotate(.25); rounded(b, -95, -95, 190, 190, 30, P.accent2, P.band, 10); b.restore(); circle(b, 2280, 205, 34, '#ffffff');
       const n = entries.length, top = 440, h = 1040, boxes = n === 2 ? [[110, 1128], [1308, 1128]] : [[110, 2326]];
       entries.forEach((e, i) => {
         const [x, w] = boxes[i], cx = x + w / 2, accent = i ? P.acc2 : P.acc1, fill = i ? P.accent2 : P.accent;
-        rounded(b, x + 22, top + 22, w, h, 36, fill); rounded(b, x, top, w, h, 36, P.panel, P.band, 8);
+        rounded(b, x + 26, top + 26, w, h, 40, fill); rounded(b, x, top, w, h, 40, P.panel, P.band, 10);
+        clipped(b, rr(x, top, w, h, 40), () => { b.fillStyle = mix(fill, '#ffffff', .82); b.fillRect(x, top, w, 26); tex(b, 'paper', .25) });
+        for (const [px, py] of [[x + w - 50, top + 50], [x + 50, top + h - 50], [x + w - 50, top + h - 50]]) hexagram(b, px, py, 22, mix(fill, '#ffffff', .3), null);
         const label = n === 2 ? 'NOME ' + (i + 1) : 'MEU NOME'; c.t.font = BOLD(26); const lw = c.t.measureText(label).width + 80;
         rounded(b, x + 50, top - 40, lw, 76, 38, fill, P.band, 6);
         text(c, label, x + 50 + lw / 2, top + 9, { font: BOLD(26), color: best(fill, '#ffffff', '#10202b'), size: 26 });
-        nameStack(c, e, i, { x, y: top + 10, w }, accent, { noLabel: true, side: 160 });
-        const f = fit(c, e, n === 2 ? w - 110 : 1970, 800, { he: n === 2 ? 92 : 112, comfort: 52, heMin: 50, pt: 34, ptMin: 27 });
-        verse(c, e, f, cx, top + 220, accent);
+        nameStack(c, e, i, { x, y: top + 14, w }, accent, { noLabel: true, side: 200 });
+        const f = fit(c, e, n === 2 ? w - 130 : 1970, 790, { he: n === 2 ? 92 : 112, comfort: 52, heMin: 50, pt: 34, ptMin: 27 });
+        verse(c, e, f, cx, top + 222, accent);
         c.blocks.push(f);
       });
-      rounded(b, 230, 1552, 2086, 110, 55, P.band);
-      footer(c, 1273, 1598, 1638, 1730, P.onBand, ensure(P.band, P.bg, 4.5));
+      rounded(b, 248, 1570, 2086, 110, 55, P.accent2); rounded(b, 230, 1552, 2086, 110, 55, P.band);
+      footer(c, 1273, 1598, 1638, 1740, P.onBand, ensure(P.band, mix(P.bg, '#ffffff', .4), 4.5));
+      // fundo claro atrás dos créditos para garantir leitura
+      rounded(b, 720, 1712, 1106, 42, 21, '#ffffffd9');
     }
   },
 
+  /* 5. Biblioteca de Torá: estante, abajur e um livro aberto sobre a mesa */
   biblioteca: {
     name: 'Biblioteca de Torá', palette: 'classico', titleFont: 'heebo',
-    paper: P => mix('#fbf4e2', P.bg, .1),
-    spots: n => [[90, 900, 0], [2456, 900, 0], [300, 1720, 0], [2246, 1720, 0], [250, 170, 170], [2296, 170, 170]],
+    paper: P => mix('#fbf3df', P.bg, .08),
+    spots: n => [[2440, 1640, 0], [120, 900, 0], [2430, 900, 0], [250, 160, 0], [2296, 160, 0]],
     draw(c, entries) {
-      const { b, P } = c, wall = ensure(mix(P.band, '#000000', .25), '#ffffff', 9), wood = mix('#7a4a22', P.band, .15), wood2 = mix(wood, '#000', .4), page = P.paper, r = rng(5);
+      const { b, P } = c, wall = ensure(mix(P.band, '#000000', .3), '#ffffff', 9), page = P.paper, r = rng(5), woodC = mix('#7a4a22', P.band, .12), woodD = mix(woodC, '#000', .45), brass = mix('#d6a945', P.accent2, .25);
+      // parede de madeira em tábuas
       b.fillStyle = wall; b.fillRect(0, 0, W, H);
-      b.fillStyle = '#ffffff10'; for (let x = 0; x < W; x += 180) b.fillRect(x, 0, 6, H);
+      b.save(); b.globalAlpha = .5; for (let x = 0; x < W; x += 212) { wood(b, x, 0, 206, H, mix(wall, '#6b4422', .35), 0, true) } b.restore();
+      let g = b.createRadialGradient(330, 1050, 60, 330, 1050, 1100); g.addColorStop(0, '#ffd98a55'); g.addColorStop(1, '#ffd98a00'); b.fillStyle = g; b.fillRect(0, 0, W, H);
       // estante com livros
-      const spines = [P.accent, P.accent2, mix(P.accent, '#000', .35), mix(P.accent2, '#000', .3), '#e9dfc8', mix(P.band, '#ffffff', .25)];
-      for (let x = 30; x < W - 40;) { const w = 46 + r() * 50, h = 170 + r() * 90, col = spines[Math.floor(r() * spines.length)]; rounded(b, x, 300 - h, w, h, 6, col, wood2, 4); b.fillStyle = mix(P.accent2, '#ffe9a8', .5); b.fillRect(x + 6, 300 - h + 24, w - 12, 6); b.fillRect(x + 6, 270, w - 12, 6); x += w + 4 }
-      rounded(b, 0, 296, W, 44, 6, wood, wood2, 4);
-      // plaquinha do título
-      rounded(b, 653, 56, 1240, 222, 30, page, P.accent2, 10); rounded(b, 675, 78, 1196, 178, 20, null, mix(P.accent2, page, .4), 3);
-      title(c, 1273, 178, 92, ensure(P.band, page, 7), 'center', 1120);
-      text(c, 'Meu nome. Minhas letras. Minha descoberta.', 1273, 238, { font: TEXT(30), color: P.muted2, size: 30 });
+      const spines = [P.accent, P.accent2, mix(P.accent, '#000', .35), mix(P.accent2, '#000', .3), '#e6d8bb', mix(P.band, '#ffffff', .2), '#7a1f2a', '#2f5d3a'];
+      for (let x = 24; x < W - 40;) {
+        if (r() < .08) { const w = 250; for (let k = 0; k < 3; k++) { const col = spines[Math.floor(r() * spines.length)]; rounded(b, x + k * 6, 292 - (k + 1) * 46, w - k * 12, 44, 6, col, woodD, 3) } x += w + 10; continue }
+        const w = 44 + r() * 46, h = 160 + r() * 95, col = spines[Math.floor(r() * spines.length)], lean = r() < .07;
+        b.save(); if (lean) { b.translate(x, 292); b.rotate(-.18); b.translate(-x, -292) }
+        b.fillStyle = grad(b, x, 0, x + w, 0, [[0, mix(col, '#000', .3)], [.35, mix(col, '#ffffff', .15)], [1, mix(col, '#000', .4)]]); b.beginPath(); b.roundRect ? b.roundRect(x, 292 - h, w, h, 6) : b.rect(x, 292 - h, w, h); b.fill(); b.strokeStyle = woodD; b.lineWidth = 3; b.stroke();
+        b.fillStyle = brass; b.fillRect(x + 5, 292 - h + 22, w - 10, 5); b.fillRect(x + 5, 292 - h + 34, w - 10, 3); b.fillRect(x + 5, 260, w - 10, 5); if (h > 200) rounded(b, x + w * .25, 292 - h * .62, w * .5, 46, 4, mix(brass, '#ffffff', .2));
+        b.restore(); x += w + (lean ? 26 : 3);
+      }
+      wood(b, 0, 290, W, 46, woodC); b.fillStyle = '#00000055'; b.fillRect(0, 336, W, 14);
+      // placa de latão
+      shadowed(b, '#00000077', 18, 0, 8, () => rounded(b, 653, 52, 1240, 226, 22, brass));
+      b.fillStyle = grad(b, 0, 52, 0, 278, [[0, '#ffffff55'], [.5, '#ffffff00'], [1, '#00000033']]); b.beginPath(); rr(653, 52, 1240, 226, 22)(b); b.fill();
+      rounded(b, 677, 76, 1192, 178, 14, mix(page, brass, .15), mix(brass, '#000', .35), 3);
+      for (const [x, y] of [[680, 80], [1866, 80], [680, 250], [1866, 250]]) { circle(b, x, y, 9, mix(brass, '#000', .25)); b.strokeStyle = '#ffffff66'; b.lineWidth = 2; b.beginPath(); b.moveTo(x - 5, y); b.lineTo(x + 5, y); b.stroke() }
+      title(c, 1273, 180, 92, ensure(P.band, mix(page, brass, .15), 7), 'center', 1120);
+      text(c, 'Meu nome. Minhas letras. Minha descoberta.', 1273, 236, { font: TEXT(30), color: ensure(P.muted2, mix(page, brass, .15), 4.5), size: 30 });
+      // mesa
+      wood(b, 0, 1585, W, 215, woodC); b.fillStyle = mix(woodC, '#ffffff', .25); b.fillRect(0, 1585, W, 8);
+      // abajur à esquerda e tinteiro à direita
+      const lampC = mix(P.accent, '#1f5a3a', .4);
+      b.fillStyle = brass; b.fillRect(122, 1180, 16, 400); rounded(b, 60, 1560, 140, 34, 12, brass, mix(brass, '#000', .4), 3);
+      b.fillStyle = grad(b, 40, 0, 220, 0, [[0, mix(lampC, '#000', .3)], [.5, mix(lampC, '#ffffff', .25)], [1, mix(lampC, '#000', .35)]]); b.beginPath(); b.moveTo(30, 1250); b.quadraticCurveTo(130, 1120, 230, 1250); b.closePath(); b.fill(); b.strokeStyle = brass; b.lineWidth = 6; b.stroke();
+      g = b.createRadialGradient(130, 1260, 10, 130, 1400, 420); g.addColorStop(0, '#fff2c0aa'); g.addColorStop(1, '#fff2c000'); b.fillStyle = g; b.beginPath(); b.moveTo(40, 1250); b.lineTo(-200, 1585); b.lineTo(480, 1585); b.lineTo(220, 1250); b.fill();
+      rounded(b, 2400, 1500, 110, 90, 18, '#1d2630', '#000', 3); rounded(b, 2425, 1480, 60, 26, 8, '#2c3946'); b.strokeStyle = '#f4efe4'; b.lineWidth = 9; b.lineCap = 'round'; b.beginPath(); b.moveTo(2455, 1480); b.quadraticCurveTo(2480, 1380, 2530, 1300); b.stroke();
       // livro aberto
-      rounded(b, 140, 372, 2266, 1190, 34, mix(P.band, '#000', .15));
-      for (let k = 3; k >= 1; k--) { b.fillStyle = mix(page, '#b89a6a', .25 + k * .08); b.beginPath(); b.moveTo(170, 400 + k * 10); b.lineTo(170, 1515 + k * 9); b.bezierCurveTo(600, 1490 + k * 9, 1000, 1500 + k * 9, 1273, 1540 + k * 9); b.bezierCurveTo(1546, 1500 + k * 9, 1946, 1490 + k * 9, 2376, 1515 + k * 9); b.lineTo(2376, 400 + k * 10); b.fill() }
-      for (const s of [-1, 1]) { const g = b.createLinearGradient(1273, 0, 1273 + s * 1100, 0); g.addColorStop(0, mix(page, '#b89a6a', .35)); g.addColorStop(.12, page); g.addColorStop(1, page); b.fillStyle = g; b.beginPath(); b.moveTo(1273, 440); b.bezierCurveTo(1273 + s * 300, 390, 1273 + s * 800, 380, 1273 + s * 1103, 400); b.lineTo(1273 + s * 1103, 1510); b.bezierCurveTo(1273 + s * 800, 1490, 1273 + s * 300, 1500, 1273, 1540); b.closePath(); b.fill(); b.strokeStyle = mix(page, '#8a6a3a', .35); b.lineWidth = 3; b.stroke() }
-      poly(b, [[1293, 1500], [1293, 1640], [1318, 1615], [1343, 1640], [1343, 1500]], P.accent, mix(P.accent, '#000', .3), 3);
-      // mesa e rodapé
-      b.fillStyle = wood; b.fillRect(0, 1600, W, 200); b.fillStyle = wood2; b.fillRect(0, 1600, W, 10);
+      const L = 260, R = 2286, M = 1273, T = 390, B = 1555;
+      shadowed(b, '#00000088', 40, 0, 20, () => rounded(b, L - 40, T - 18, R - L + 80, B - T + 50, 26, mix(P.band, '#000', .1)));
+      b.save(); b.setLineDash([14, 10]); rounded(b, L - 24, T - 2, R - L + 48, B - T + 20, 18, null, brass + 'aa', 3); b.restore();
+      for (let k = 3; k >= 1; k--) { b.fillStyle = mix(page, '#b89a6a', .2 + k * .08); b.beginPath(); b.moveTo(L - 6, T + 20 + k * 8); b.lineTo(L - 6, B - 30 + k * 8); b.bezierCurveTo(L + 400, B - 50 + k * 8, M - 300, B - 40 + k * 8, M, B + k * 8); b.bezierCurveTo(M + 300, B - 40 + k * 8, R - 400, B - 50 + k * 8, R + 6, B - 30 + k * 8); b.lineTo(R + 6, T + 20 + k * 8); b.fill() }
+      for (const sgn of [-1, 1]) {
+        const edge = M + sgn * (M - L), path = x => { x.moveTo(M, T + 50); x.bezierCurveTo(M + sgn * 300, T, M + sgn * 700, T - 10, edge, T + 18); x.lineTo(edge, B - 34); x.bezierCurveTo(M + sgn * 700, B - 52, M + sgn * 300, B - 44, M, B); x.closePath() };
+        clipped(b, path, () => { b.fillStyle = page; b.fillRect(0, 0, W, H); tex(b, 'paper', .55); tex(b, 'blotch', .12); b.fillStyle = grad(b, M, 0, M + sgn * 260, 0, [[0, '#7a5a2a55'], [1, '#7a5a2a00']]); b.fillRect(Math.min(M, M + sgn * 260), 0, 260, H) });
+        b.beginPath(); path(b); b.strokeStyle = mix(page, '#7a5a2a', .4); b.lineWidth = 3; b.stroke();
+      }
+      poly(b, [[M + 22, B - 20], [M + 22, B + 66], [M + 46, B + 48], [M + 70, B + 66], [M + 70, B - 20]], P.accent, mix(P.accent, '#000', .35), 3);
       const n = entries.length;
       if (n === 2) entries.forEach((e, i) => {
         const x = i ? 1346 : 240, w = 960, cx = x + w / 2, accent = i ? P.acc2 : P.acc1;
-        nameStack(c, e, i, { x, y: 450, w }, accent, { side: 140 });
-        const f = fit(c, e, w - 40, 820, { he: 88, comfort: 50, heMin: 48, pt: 33, ptMin: 26 });
-        verse(c, e, f, cx, 660, accent, { divider: P.accent2 });
+        nameStack(c, e, i, { x, y: 440, w }, accent, { side: 160 });
+        const f = fit(c, e, w - 70, 820, { he: 88, comfort: 50, heMin: 48, pt: 33, ptMin: 26 });
+        verse(c, e, f, cx, 650, accent, { divider: P.accent2 });
         c.blocks.push(f);
       });
       else {
-        const e = entries[0], accent = P.acc1;
-        nameStack(c, e, 0, { x: 1346, y: 450, w: 960 }, accent, { side: 140 });
-        const f = fit(c, e, 900, 820, { he: 104, comfort: 52, heMin: 48, pt: 34, ptMin: 26, ptW: 0, gap: 40 });
-        let y = 660 + Math.max(0, (820 - f.total) / 2), y0 = y; const h = drawHebrew(c, f, 1826, y); y = h.y;
-        const ref = `${e.v.book} ${e.v.chapter}:${e.v.verse}`; const rw = text(c, ref, 1826, y + 30, { font: BOLD(30), color: accent, size: 30, free: true });
-        protect(c, 1826 - Math.max(h.maxW, rw) / 2, y0, Math.max(h.maxW, rw), y + 40 - y0);
-        // página da tradução
-        const want = Math.round(46 * PT_SCALES[c.design.ptScale ?? 1]); let pt = want, pl; c.t.font = TEXT(pt);
-        for (; ; pt--) { c.t.font = TEXT(pt); pl = lines(c.t, e.v.translation, 860); if (pl.length * pt * 1.45 <= 700 || pt <= 24) break } pl = balanced(c.t, e.v.translation, 860);
-        text(c, 'TRADUÇÃO', 760, 520, { font: BOLD(24), color: P.acc2, size: 24 });
-        c.t.fillStyle = P.accent2; c.t.fillRect(710, 548, 100, 5);
-        let ty = 640 + Math.max(0, (700 - pl.length * pt * 1.45) / 2) + pt; const tr = drawTranslation(c, f, 760, ty, pl, pt);
-        protect(c, 760 - tr.maxW / 2, ty - pt, tr.maxW, tr.y - ty);
+        const e = entries[0], accent = P.acc1, cxR = 1785, cxL = 761;
+        nameStack(c, e, 0, { x: 1325, y: 440, w: 920 }, accent, { side: 140 });
+        const f = fit(c, e, 860, 820, { he: 104, comfort: 52, heMin: 48, pt: 34, ptMin: 26, ptW: 0, gap: 40 });
+        let y = 650 + Math.max(0, (820 - f.total) / 2), y0 = y; const hh = drawHebrew(c, f, cxR, y); y = hh.y;
+        const ref = `${e.v.book} ${e.v.chapter}:${e.v.verse}`; const rw = text(c, ref, cxR, y + 30, { font: BOLD(30), color: accent, size: 30, free: true });
+        protect(c, cxR - Math.max(hh.maxW, rw) / 2, y0, Math.max(hh.maxW, rw), y + 40 - y0);
+        const want = Math.round(46 * PT_SCALES[c.design.ptScale ?? 1]); let pt = want, pl;
+        for (; ; pt--) { c.t.font = TEXT(pt); pl = lines(c.t, e.v.translation, 820); if (pl.length * pt * 1.45 <= 700 || pt <= 24) break } pl = balanced(c.t, e.v.translation, 820);
+        text(c, 'TRADUÇÃO', cxL, 520, { font: BOLD(24), color: P.acc2, size: 24 });
+        c.t.fillStyle = P.accent2; c.t.fillRect(cxL - 50, 548, 100, 5);
+        let ty = 640 + Math.max(0, (700 - pl.length * pt * 1.45) / 2) + pt; const tr = drawTranslation(c, f, cxL, ty, pl, pt);
+        protect(c, cxL - tr.maxW / 2, ty - pt, tr.maxW, tr.y - ty);
         c.ptReduced = pt < want; c.blocks.push(Object.assign({}, f, { pt, ptPage: { lines: pl.length, total: pl.length * pt * 1.45, maxH: 700 } }));
       }
-      footer(c, 1273, 1672, 1714, 1770, ensure('#fbf1dc', wood, 7), ensure('#e7d3b0', wood, 4.5));
+      footer(c, 1273, 1672, 1714, 1770, ensure('#fbf1dc', woodC, 7), ensure('#e7d3b0', woodC, 4.5));
     }
   }
 };
@@ -379,5 +472,5 @@ function draw(entries, art, design, images) { const r = render(entries, art, des
 function layout(ctx, entries) { const r = render(entries, null, defaults()); return r.blocks }
 function pdf(canvas) { const bytes = Uint8Array.from(atob(canvas.toDataURL('image/jpeg', .95).split(',')[1]), c => c.charCodeAt(0)); const enc = new TextEncoder(), parts = [], offset = [0]; let len = 0; function add(s) { const b = typeof s === 'string' ? enc.encode(s) : s; parts.push(b); len += b.length } function obj(n, s) { offset[n] = len; add(n + ' 0 obj\n' + s + '\nendobj\n') } add('%PDF-1.4\n'); obj(1, '<< /Type /Catalog /Pages 2 0 R >>'); obj(2, '<< /Type /Pages /Kids [3 0 R] /Count 1 >>'); obj(3, '<< /Type /Page /Parent 2 0 R /MediaBox [0 0 841.89 595.28] /Resources << /XObject << /Im0 4 0 R >> >> /Contents 5 0 R >>'); offset[4] = len; add(`4 0 obj\n<< /Type /XObject /Subtype /Image /Width ${canvas.width} /Height ${canvas.height} /ColorSpace /DeviceRGB /BitsPerComponent 8 /Filter /DCTDecode /Length ${bytes.length} >>\nstream\n`); add(bytes); add('\nendstream\nendobj\n'); let content = 'q 841.89 0 0 595.28 0 0 cm /Im0 Do Q'; obj(5, `<< /Length ${content.length} >>\nstream\n${content}\nendstream`); const start = len; add('xref\n0 6\n0000000000 65535 f \n'); for (let i = 1; i <= 5; i++)add(String(offset[i]).padStart(10, '0') + ' 00000 n \n'); add(`trailer\n<< /Size 6 /Root 1 0 R >>\nstartxref\n${start}\n%%EOF`); return new Blob(parts, { type: 'application/pdf' }) }
 function download(blob, name) { let a = document.createElement('a'), u = URL.createObjectURL(blob); a.href = u; a.download = name; document.body.append(a); a.click(); a.remove(); setTimeout(() => URL.revokeObjectURL(u), 60000) }
-return { W, H, draw, render, compose, layout, pdf, download, lines, defaults, effective, TEMPLATES, PALETTES, TITLE_FONTS, PASUK_FONTS, PT_SCALES, contrast, ensure, colors, font, byId };
+return { W, H, loadTextures, draw, render, compose, layout, pdf, download, lines, defaults, effective, TEMPLATES, PALETTES, TITLE_FONTS, PASUK_FONTS, PT_SCALES, contrast, ensure, colors, font, byId };
 })();

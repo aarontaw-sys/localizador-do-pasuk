@@ -22,7 +22,7 @@ Arquivos obtidos do Google Fonts (fonts.google.com) sem modificação.
 - card-text.ttf — Nunito. Copyright 2014 The Nunito Project Authors (https://github.com/googlefonts/nunito) Licença: SIL Open Font License 1.1.
 - hebrew.ttf — DejaVu Sans. Copyright (c) 2003 Bitstream, Inc.; (c) 2006 Tavmjong Bah. Licença: Bitstream Vera / DejaVu (https://dejavu-fonts.github.io/License.html).
 
-Ilustrações do editor (stickers/*.png): desenhos vetoriais feitos para este site; fontes em research/stickers.
+Ilustrações do editor (stickers/*.png) e texturas (textures/*.png): feitas para este site; código-fonte em research/stickers e research/textures.
 
 -----------------------------------------------------------
 SIL OPEN FONT LICENSE Version 1.1 - 26 February 2007

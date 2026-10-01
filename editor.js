@@ -48,7 +48,8 @@ function overlap(a, b) { const ha = half(a), hb = half(b), w = Math.min(a.x + ha
 function place(s, near) {
   const grid = []; for (let y = 90; y < H; y += 70) for (let x = 90; x < W; x += 70) grid.push([x, y]);
   const spots = r.spots.map(p => [p[0], p[1]]), others = design.stickers.filter(o => o !== s);
-  for (const size of [s.s, 260, 200, 150, MIN].filter((v, i, a) => v <= s.s && a.indexOf(v) === i)) {
+  const sizes = []; for (let v = s.s; v > MIN; v *= .88) sizes.push(v); sizes.push(MIN);
+  for (const size of sizes) {
     let bestC = null, bestScore = Infinity;
     [...spots, ...grid].forEach(([x, y], i) => {
       const c = inPage(Object.assign({}, s, { x, y, s: size })); if (!free(c)) return;
@@ -74,11 +75,23 @@ function settle() {
 
 /* ---------- desenho da prévia ---------- */
 function size() { const c = $('#edCanvas'), w = c.clientWidth, dpr = Math.min(2, window.devicePixelRatio || 1); const pw = Math.round(w * dpr), ph = Math.round(pw * H / W); if (c.width !== pw) { c.width = pw; c.height = ph } }
-function paint() { cancelAnimationFrame(frame); frame = requestAnimationFrame(() => { size(); Card.compose(r, design.stickers, imgs, $('#edCanvas')); overlay() }) }
+let cache = null;
+function scaled(src, w, h) { const c = document.createElement('canvas'); c.width = w; c.height = h; const x = c.getContext('2d'); x.imageSmoothingQuality = 'high'; x.drawImage(src, 0, 0, w, h); return c }
+function draw() {
+  size(); const c = $('#edCanvas'), x = c.getContext('2d'), k = c.width / W;
+  if (!cache || cache.r !== r || cache.w !== c.width) cache = { r, w: c.width, base: scaled(r.base, c.width, c.height), text: scaled(r.text, c.width, c.height) };
+  x.setTransform(1, 0, 0, 1, 0, 0); x.clearRect(0, 0, c.width, c.height); x.drawImage(cache.base, 0, 0);
+  for (const s of design.stickers) { const img = imgs[s.id]; if (!img) continue; x.save(); x.translate(s.x * k, s.y * k); x.rotate(s.r * Math.PI / 180); x.drawImage(img, -s.s * k / 2, -s.s * k / 2, s.s * k, s.s * k); x.restore() }
+  x.drawImage(cache.text, 0, 0); overlay();
+}
+function paint() { cancelAnimationFrame(frame); frame = requestAnimationFrame(draw) }
 function overlay() {
-  const box = $('#sel'), bar = $('#selbar'), s = design.stickers.find(s => s.k === selected);
-  box.hidden = bar.hidden = !s; if (!s) return;
-  const k = $('#edCanvas').clientWidth / W, side = s.s * K * 2 * k;
+  const box = $('#sel'), s = design.stickers.find(s => s.k === selected);
+  box.hidden = !s; if (!s) return;
+  const k = $('#edCanvas').clientWidth / W, side = Math.max(64, s.s * K * 2 * k);
+  box.classList.toggle('warn', !free(s));
+  const cw = $('#edCanvas').clientWidth, ch = $('#edCanvas').clientHeight, l = s.x * k - side / 2, t = s.y * k - side / 2;
+  box.classList.toggle('flipv', t < 80); box.classList.toggle('flipr', l + side > cw - 30); box.classList.toggle('flipl', l < 30); box.classList.toggle('flipb', t + side > ch - 30);
   box.style.width = box.style.height = side + 'px'; box.style.left = (s.x * k - side / 2) + 'px'; box.style.top = (s.y * k - side / 2) + 'px'; box.style.transform = `rotate(${s.r}deg)`;
 }
 function point(e) { const b = $('#edCanvas').getBoundingClientRect(), k = W / b.width; return { x: (e.clientX - b.left) * k, y: (e.clientY - b.top) * k } }
@@ -94,6 +107,20 @@ async function change(fn, relayout = true) {
 }
 async function restore(state) { design = JSON.parse(state); await fonts(design); layout(); note(notes()); paint(); sync(); buttons() }
 function sticker(s) { return design.stickers.find(x => x.k === selected) }
+// encaixe ao soltar: desliza (animado) para o espaço livre mais próximo
+function land(s, done, floor) {
+  let t = null;
+  // ao aumentar sem espaço, fica no maior tamanho que cabe ali, nunca menor que antes do gesto
+  if (floor && s.s > floor) for (let v = s.s; v >= floor; v = v > floor ? Math.max(floor, v * .94) : floor - 1) { const c = resolve(Object.assign({}, s, { s: v })); if (c && Math.hypot(c.x - s.x, c.y - s.y) < 160) { t = c; break } }
+  if (!t) t = resolve(s); if (!t || Math.hypot(t.x - s.x, t.y - s.y) > 700) t = place(s, s) || t || place(Object.assign({}, s, { s: MIN }), s);
+  if (!t) { done(); return }
+  const moved = Math.hypot(t.x - s.x, t.y - s.y) > 6 || Math.abs(t.s - s.s) > 2;
+  if (moved) note('O enfeite foi para o espaço livre mais próximo, sem cobrir o texto.');
+  const from = { x: s.x, y: s.y, s: s.s }, t0 = performance.now();
+  let finished = false; const finish = () => { if (finished) return; finished = true; Object.assign(s, { x: t.x, y: t.y, s: t.s }); paint(); done() };
+  const step = now => { if (finished) return; const k = Math.min(1, (now - t0) / 180), q = 1 - Math.pow(1 - k, 3); s.x = from.x + (t.x - from.x) * q; s.y = from.y + (t.y - from.y) * q; s.s = from.s + (t.s - from.s) * q; draw(); if (k < 1) requestAnimationFrame(step); else finish() };
+  if (moved) { requestAnimationFrame(step); setTimeout(finish, 260) } else finish()
+}
 function tweak(fn) {
   const s = sticker(); if (!s) return; const prev = snap(), before = Object.assign({}, s); fn(s); s.s = Math.max(MIN, Math.min(MAX, s.s));
   const t = resolve(s); if (t) Object.assign(s, t); else { Object.assign(s, before); note('Não há espaço livre para isso aqui. Arraste o enfeite para um lugar vazio.') }
@@ -123,12 +150,6 @@ function build() {
     if (d.pasukFont) return change(x => { x.pasukFont = d.pasukFont });
     if (d.ptSize) return change(x => { x.ptScale = Number(d.ptSize) });
     if (d.ptColor !== undefined) return change(x => { x.ptColor = d.ptColor || null });
-    if (d.act === 'smaller') return tweak(s => { s.s *= .85 });
-    if (d.act === 'bigger') return tweak(s => { s.s *= 1.18 });
-    if (d.act === 'left') return tweak(s => { s.r = (s.r - 15) % 360 });
-    if (d.act === 'right') return tweak(s => { s.r = (s.r + 15) % 360 });
-    if (d.act === 'front') return change(x => { const s = sticker(); x.stickers = x.stickers.filter(o => o !== s).concat(s) }, false);
-    if (d.act === 'delete') { return change(x => { x.stickers = x.stickers.filter(o => o.k !== selected); selected = null }, false) }
   });
   ed.addEventListener('input', e => {
     const t = e.target;
@@ -140,26 +161,36 @@ function build() {
   let armed = 0; $('#reset').onclick = () => { const b = $('#reset'); if (Date.now() - armed > 4000) { armed = Date.now(); b.textContent = 'Toque de novo para restaurar'; note('Restaurar volta cores, letras e enfeites ao início. Você pode usar Desfazer depois.'); setTimeout(() => { if (Date.now() - armed >= 4000) b.textContent = 'Restaurar modelo' }, 4100); return } armed = 0; b.textContent = 'Restaurar modelo'; change(x => { const t = x.template; Object.assign(x, Card.defaults(t)); selected = null }) };
 
   const stage = $('#stage');
+  const grab = (e, mode, s) => { const b = $('#edCanvas').getBoundingClientRect(), k = b.width / W, c = { x: b.left + s.x * k, y: b.top + s.y * k }; return { mode, c, d0: Math.max(20, Math.hypot(e.clientX - c.x, e.clientY - c.y)), a0: Math.atan2(e.clientY - c.y, e.clientX - c.x), orig: Object.assign({}, s), prev: snap() } };
   stage.addEventListener('pointerdown', e => {
     if (e.target.closest('.h-del')) return;
     try { stage.setPointerCapture(e.pointerId) } catch { } pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
     const s = sticker();
-    if (e.target.closest('.h-rot') && s) { const b = $('#edCanvas').getBoundingClientRect(), k = b.width / W, c = { x: b.left + s.x * k, y: b.top + s.y * k }; drag = { mode: 'handle', c, d0: Math.hypot(e.clientX - c.x, e.clientY - c.y), a0: Math.atan2(e.clientY - c.y, e.clientX - c.x), orig: Object.assign({}, s), prev: snap() }; return }
-    if (pointers.size === 2 && s) { const [a, b] = [...pointers.values()]; drag = { mode: 'pinch', d0: Math.hypot(a.x - b.x, a.y - b.y), a0: Math.atan2(b.y - a.y, b.x - a.x), orig: Object.assign({}, s), prev: drag ? drag.prev : snap() }; return }
+    if (s && e.target.closest('.h-rot')) { drag = grab(e, 'rotate', s); e.preventDefault(); return }
+    if (s && e.target.closest('.h-size')) { drag = grab(e, 'size', s); e.preventDefault(); return }
+    if (pointers.size === 2 && s) { const [a, b] = [...pointers.values()]; drag = { mode: 'pinch', d0: Math.max(20, Math.hypot(a.x - b.x, a.y - b.y)), a0: Math.atan2(b.y - a.y, b.x - a.x), orig: Object.assign({}, s), prev: drag ? drag.prev : snap() }; return }
     if (pointers.size > 1) return;
-    const p = point(e), h = hit(p);
-    selected = h ? h.k : null; drag = h ? { mode: 'move', p, orig: Object.assign({}, h), prev: snap() } : null;
-    if (h) e.preventDefault(); paint();
+    const p = point(e), h = hit(p), prev = snap();
+    selected = h ? h.k : null;
+    if (h) { design.stickers = design.stickers.filter(o => o !== h).concat(h); drag = { mode: 'move', p, orig: Object.assign({}, h), prev }; e.preventDefault() } else drag = null;
+    paint();
   });
+  // durante o gesto o enfeite segue o dedo livremente; ao soltar ele encaixa fora dos textos
   stage.addEventListener('pointermove', e => {
     if (!pointers.has(e.pointerId) || !drag) return; pointers.set(e.pointerId, { x: e.clientX, y: e.clientY });
-    const s = sticker(); if (!s) return; let cand = Object.assign({}, s);
-    if (drag.mode === 'move') { const p = point(e); cand.x = drag.orig.x + p.x - drag.p.x; cand.y = drag.orig.y + p.y - drag.p.y }
-    else if (drag.mode === 'handle') { const d = Math.hypot(e.clientX - drag.c.x, e.clientY - drag.c.y), a = Math.atan2(e.clientY - drag.c.y, e.clientX - drag.c.x); cand.s = Math.max(MIN, Math.min(MAX, drag.orig.s * d / drag.d0)); cand.r = drag.orig.r + (a - drag.a0) * 180 / Math.PI }
-    else if (drag.mode === 'pinch' && pointers.size === 2) { const [a, b] = [...pointers.values()]; cand.s = Math.max(MIN, Math.min(MAX, drag.orig.s * Math.hypot(a.x - b.x, a.y - b.y) / drag.d0)); cand.r = drag.orig.r + (Math.atan2(b.y - a.y, b.x - a.x) - drag.a0) * 180 / Math.PI }
-    const t = resolve(cand); if (t && Math.hypot(t.x - cand.x, t.y - cand.y) < 450) { Object.assign(s, t); paint() }
+    const s = sticker(); if (!s) return;
+    if (drag.mode === 'move') { const p = point(e); s.x = drag.orig.x + p.x - drag.p.x; s.y = drag.orig.y + p.y - drag.p.y }
+    else if (drag.mode === 'rotate') s.r = drag.orig.r + (Math.atan2(e.clientY - drag.c.y, e.clientX - drag.c.x) - drag.a0) * 180 / Math.PI;
+    else if (drag.mode === 'size') s.s = Math.max(MIN, Math.min(MAX, drag.orig.s * Math.hypot(e.clientX - drag.c.x, e.clientY - drag.c.y) / drag.d0));
+    else if (drag.mode === 'pinch' && pointers.size === 2) { const [a, b] = [...pointers.values()]; s.s = Math.max(MIN, Math.min(MAX, drag.orig.s * Math.hypot(a.x - b.x, a.y - b.y) / drag.d0)); s.r = drag.orig.r + (Math.atan2(b.y - a.y, b.x - a.x) - drag.a0) * 180 / Math.PI }
+    inPage(s); paint();
   });
-  const end = e => { pointers.delete(e.pointerId); if (pointers.size) return; if (drag && snap() !== drag.prev) { const s = sticker(); if (s) s.r = Math.round(s.r) % 360; commit(drag.prev) } drag = null };
+  const end = e => {
+    pointers.delete(e.pointerId); if (pointers.size || !drag) return;
+    const d = drag; drag = null; const s = sticker(); if (!s) return;
+    s.r = ((Math.round(s.r) % 360) + 360) % 360;
+    land(s, () => { if (snap() !== d.prev) commit(d.prev) }, d.mode === 'move' ? 0 : d.orig.s);
+  };
   stage.addEventListener('pointerup', end); stage.addEventListener('pointercancel', end);
   $('#sel .h-del').addEventListener('click', () => change(x => { x.stickers = x.stickers.filter(o => o.k !== selected); selected = null }, false));
   window.addEventListener('resize', () => { if (!ed.hidden) paint() });
@@ -189,7 +220,7 @@ async function add(id) {
   const s = { k: uid++, id, x: W / 2, y: H / 2, s: 260, r: 0 }, p = place(s);
   if (!p) return note('Não encontrei espaço livre. Diminua ou remova um enfeite.');
   await change(x => { x.stickers.push(Object.assign(s, p)) }, false); selected = s.k; paint();
-  note('Arraste para mover. Use dois dedos ou a bolinha do canto para girar e mudar o tamanho.');
+  note('Arraste para mover. Use ↻ para girar e ⤡ para aumentar ou diminuir (ou dois dedos).');
   if (matchMedia('(max-width: 1000px)').matches) $('#stage').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
 }
 
@@ -198,7 +229,7 @@ async function open(list, artImg) {
   entries = list; art = artImg; build();
   if (!design) design = Card.defaults();
   uid = Math.max(uid, ...design.stickers.map(s => s.k + 1));
-  await Promise.all([images(), fonts(design)]); layout(); settle(); note(notes()); buttons(); showTab(tab); paint(); sync();
+  await Promise.all([images(), fonts(design), Card.loadTextures()]); layout(); settle(); note(notes()); buttons(); showTab(tab); paint(); sync();
 }
 function exportCanvas() { const c = document.createElement('canvas'); c.width = W; c.height = H; Card.compose(r, design.stickers, imgs, c); return c }
 return { open, exportCanvas, get design() { return design }, STICKERS, _test: { resolve, place, hits: (s) => r.protect.filter(p => hits(s, p)), get r() { return r }, add, change, tweak, select: k => { selected = k; paint() } } };
