@@ -811,6 +811,38 @@ window.VERSES = [
     "verified": true
   },
   {
+    "id": 445,
+    "pair": "שה",
+    "he": "שָׁמְעָה וַתִּשְׂמַח צִיּוֹן וַתָּגֵלְנָה בְּנוֹת יְהוּדָה לְמַעַן מִשְׁפָּטֶיךָ יְהֹוָה׃",
+    "refHe": "תהלים צז, ח",
+    "book": "Tehilim (Salmos)",
+    "chapter": 97,
+    "verse": 8,
+    "translation": "Tsiyon ouviu e ficou feliz; as cidades de Yehudá festejaram por causa das Tuas decisões justas, Hashem.",
+    "meaning": "Quando a justiça de Hashem aparece, todo o povo se alegra junto.",
+    "kind": "positivo",
+    "source": "https://he.wikisource.org/wiki/תהלים_צז_ח",
+    "sourcePair": "https://he.wikisource.org/wiki/פסוק_המתחיל_ומסתיים_באות_ש_ה",
+    "verified": true,
+    "verificationMethod": "Full vocalized citation on source pair page, checked 2026-10-02"
+  },
+  {
+    "id": 446,
+    "pair": "שה",
+    "he": "שְׂאוּ יְדֵכֶם קֹדֶשׁ וּבָרְכוּ אֶת יְהֹוָה׃",
+    "refHe": "תהלים קלד, ב",
+    "book": "Tehilim (Salmos)",
+    "chapter": 134,
+    "verse": 2,
+    "translation": "Levantem as mãos com santidade e bendigam Hashem.",
+    "meaning": "Um convite para agradecer e abençoar Hashem de todo o coração.",
+    "kind": "positivo",
+    "source": "https://he.wikisource.org/wiki/תהלים_קלד_ב",
+    "sourcePair": "https://he.wikisource.org/wiki/פסוק_המתחיל_ומסתיים_באות_ש_ה",
+    "verified": true,
+    "verificationMethod": "Full vocalized citation on source pair page, checked 2026-10-02"
+  },
+  {
     "id": 55,
     "pair": "של",
     "he": "שָׁלוֹם רָב לְאֹהֲבֵי תוֹרָתֶךָ וְאֵין לָמוֹ מִכְשׁוֹל׃",
