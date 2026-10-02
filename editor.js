@@ -2,7 +2,15 @@
    Tudo acontece no aparelho do aluno; nada é enviado ou guardado no servidor. */
 window.Editor = (() => {
 const $ = s => document.querySelector(s), W = Card.W, H = Card.H;
-const STICKERS = [['estrela-de-david', 'Estrela de Davi'], ['menora', 'Menorá'], ['rolo-de-tora', 'Rolo de Torá'], ['livro-aberto', 'Livro aberto'], ['tabuas-da-alianca', 'Tábuas da aliança'], ['jerusalem', 'Jerusalém'], ['kotel', 'Kotel'], ['roma', 'Romã'], ['ramo-de-oliveira', 'Ramo de oliveira'], ['shofar', 'Shofar'], ['taca-de-kidush', 'Taça de kidush'], ['coroa', 'Coroa'], ['lupa', 'Lupa'], ['pena', 'Pena'], ['pergaminho', 'Pergaminho']];
+const STICKERS_JUDAISMO = [['estrela-de-david', 'Estrela de Davi'], ['menora', 'Menorá'], ['rolo-de-tora', 'Rolo de Torá'], ['livro-aberto', 'Livro aberto'], ['tabuas-da-alianca', 'Tábuas da aliança'], ['jerusalem', 'Jerusalém'], ['kotel', 'Kotel'], ['roma', 'Romã'], ['ramo-de-oliveira', 'Ramo de oliveira'], ['shofar', 'Shofar'], ['taca-de-kidush', 'Taça de kidush'], ['coroa', 'Coroa'], ['lupa', 'Lupa'], ['pena', 'Pena'], ['pergaminho', 'Pergaminho'], ['bandeira-de-israel', 'Bandeira de Israel'], ['kipa', 'Kipá'], ['talit', 'Talit'], ['tefilin', 'Tefilin'], ['chala', 'Chalá'], ['vela-de-havdala', 'Vela de havdalá'], ['besamim', 'Besamim'], ['lulav-e-etrog', 'Lulav e etrog'], ['suca', 'Sucá'], ['caixa-de-tsedaca', 'Caixa de tsedacá']];
+const STICKER_GROUPS = [
+  ['Judaísmo e Israel', STICKERS_JUDAISMO],
+  ['Esportes', [['bola-de-futebol', 'Bola de futebol'], ['bola-de-basquete', 'Bola de basquete'], ['bola-de-volei', 'Bola de vôlei'], ['raquete-de-tenis', 'Tênis'], ['ping-pong', 'Pingue-pongue'], ['oculos-de-natacao', 'Natação'], ['skate', 'Skate'], ['bicicleta', 'Bicicleta'], ['trofeu', 'Troféu']]],
+  ['Jogos e brinquedos', [['controle-de-videogame', 'Videogame'], ['cubo-magico', 'Cubo mágico'], ['blocos-de-montar', 'Blocos de montar'], ['robo', 'Robô'], ['carro-de-corrida', 'Carro de corrida']]],
+  ['Música e arte', [['violao', 'Violão'], ['tambor', 'Tambor'], ['fones-de-ouvido', 'Fones de ouvido'], ['caixa-de-som', 'Caixa de som'], ['paleta-de-pintura', 'Pintura'], ['lapis-de-cor', 'Lápis de cor'], ['camera', 'Câmera']]],
+  ['Aventura e ciência', [['foguete', 'Foguete'], ['planeta', 'Planeta'], ['bussola', 'Bússola'], ['mochila', 'Mochila']]]
+];
+const STICKERS = STICKER_GROUPS.flatMap(g => g[1]);
 const PT_COLORS = ['#1b3548', '#0e6b70', '#2f5d3a', '#7a1f3d', '#b03030', '#8a4b0f', '#4b3a8c', '#000000'];
 const SWATCHES = ['#f1f8f8', '#fdf3e1', '#fff1e3', '#fbeef0', '#f1eefb', '#eef5e6', '#e8f7f8', '#ffffff', '#163e54', '#1f4e79', '#3d2f6b', '#7a1f3d', '#2f5d3a', '#5c3a1a', '#0d4d63', '#8a3b12', '#138c91', '#2a8fbd', '#7b61c9', '#d8434f', '#6d9a3a', '#ef7d32', '#e8b54a', '#ce9324'];
 const K = .44, MIN = 110, MAX = 700, esc = s => String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -20,8 +28,8 @@ async function fonts(d) {
   const e = Card.effective(d), tf = Card.byId(Card.TITLE_FONTS, e.titleFont), pf = Card.byId(Card.PASUK_FONTS, e.pasukFont);
   await Promise.all([Card.font(tf, 40), Card.font(pf, 40), '40px "CardText"', 'bold 40px "CardText"'].map(f => document.fonts.load(f, 'אבג Meu á')));
 }
-async function images() {
-  await Promise.all(STICKERS.filter(([id]) => !imgs[id]).map(([id]) => new Promise(res => { const i = new Image(); i.onload = () => { imgs[id] = i; res() }; i.onerror = res; i.src = 'stickers/' + id + '.png' })));
+async function images(ids) {
+  await Promise.all([...new Set(ids)].filter(id => !imgs[id]).map(id => new Promise(res => { const i = new Image(); i.onload = () => { imgs[id] = i; res() }; i.onerror = res; i.src = 'stickers/' + id + '.png' })));
 }
 function layout() { r = Card.render(entries, art, design) }
 
@@ -130,7 +138,8 @@ function tweak(fn) {
 /* ---------- interface ---------- */
 function build() {
   if (built) return; built = true;
-  $('#stickerList').innerHTML = STICKERS.map(([id, l]) => `<button type="button" class="stk" data-sticker="${id}"><img src="stickers/${id}.png" alt="" loading="lazy"><span>${l}</span></button>`).join('');
+  const tray = list => list.map(([id, l]) => `<button type="button" class="stk" data-sticker="${id}"><img src="stickers/${id}.png" alt="" loading="lazy"><span>${l}</span></button>`).join('');
+  $('#stickerList').innerHTML = STICKER_GROUPS.map(([g, list]) => `<h4 class="stkgroup">${g}</h4>${tray(list)}`).join('');
   $('#paletteList').innerHTML = Object.entries(Card.PALETTES).map(([id, p]) => `<button type="button" class="pal" data-palette="${id}"><span class="chips">${[p.band, p.accent, p.accent2, p.bg].map(c => `<i style="background:${c}"></i>`).join('')}</span>${esc(p.name)}</button>`).join('') + `<button type="button" class="pal" data-palette="custom"><span class="chips rainbow"><i></i><i></i><i></i><i></i></span>Minhas cores</button>`;
   $('#customColors').innerHTML = [['bg', 'Fundo'], ['band', 'Cor principal'], ['accent', 'Destaque 1'], ['accent2', 'Destaque 2']].map(([k, l]) => `<div class="colorrow"><b>${l}</b><div class="sw">${SWATCHES.map(c => `<button type="button" aria-label="${l} ${c}" data-custom="${k}" data-color="${c}" style="background:${c}"></button>`).join('')}<label class="more" title="Outra cor"><input type="color" data-custom-input="${k}"><span>+</span></label></div></div>`).join('');
   $('#titleFonts').innerHTML = Card.TITLE_FONTS.map(f => `<button type="button" class="fontbtn" data-title-font="${f.id}" style="font:${f.f.replace('{}', 30 * f.k)}"><span lang="he" dir="rtl">שָׁלוֹם</span> Amidá<small>${f.label}</small></button>`).join('');
@@ -217,6 +226,7 @@ function sync() {
 }
 async function add(id) {
   if (design.stickers.length >= 12) return note('Já há 12 enfeites. Remova um para colocar outro.');
+  await images([id]); if (!imgs[id]) return note('Não foi possível carregar este enfeite. Tente de novo.');
   const s = { k: uid++, id, x: W / 2, y: H / 2, s: 260, r: 0 }, p = place(s);
   if (!p) return note('Não encontrei espaço livre. Diminua ou remova um enfeite.');
   await change(x => { x.stickers.push(Object.assign(s, p)) }, false); selected = s.k; paint();
@@ -229,7 +239,7 @@ async function open(list, artImg) {
   entries = list; art = artImg; build();
   if (!design) design = Card.defaults();
   uid = Math.max(uid, ...design.stickers.map(s => s.k + 1));
-  await Promise.all([images(), fonts(design), Card.loadTextures()]); layout(); settle(); note(notes()); buttons(); showTab(tab); paint(); sync();
+  await Promise.all([images(design.stickers.map(s => s.id)), fonts(design), Card.loadTextures()]); layout(); settle(); note(notes()); buttons(); showTab(tab); paint(); sync();
 }
 function exportCanvas() { const c = document.createElement('canvas'); c.width = W; c.height = H; Card.compose(r, design.stickers, imgs, c); return c }
 return { open, exportCanvas, get design() { return design }, STICKERS, _test: { resolve, place, hits: (s) => r.protect.filter(p => hits(s, p)), get r() { return r }, add, change, tweak, select: k => { selected = k; paint() } } };
